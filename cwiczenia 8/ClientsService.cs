@@ -17,11 +17,9 @@ namespace Tutorial8.Services
             {
                 await conn.OpenAsync();
 
-                // Sprawdzenie czy klient istnieje
                 if (!await CheckClientExists(conn, clientId))
                     return null;
 
-                // Pobranie danych klienta
                 using (SqlCommand cmd = new SqlCommand(@"
                     SELECT IdClient, FirstName, LastName 
                     FROM Client 
@@ -48,7 +46,6 @@ namespace Tutorial8.Services
                     }
                 }
 
-                // Pobranie wycieczek klienta
                 string tripsQuery = @"
                     SELECT 
                         t.IdTrip, t.Name, t.Description, t.DateFrom, t.DateTo, t.MaxPeople, 
@@ -74,7 +71,6 @@ namespace Tutorial8.Services
                         {
                             int tripId = reader.GetInt32(reader.GetOrdinal("IdTrip"));
 
-                            // Jeśli to nowa wycieczka, dodaj ją do listy
                             if (tripId != lastTripId)
                             {
                                 currentTrip = new ClientTripDetailsDTO
@@ -89,7 +85,6 @@ namespace Tutorial8.Services
                                     Countries = new List<CountryDTO>()
                                 };
 
-                                // Obsługa null-owych wartości dla płatności
                                 if (!reader.IsDBNull(reader.GetOrdinal("PaymentAmount")))
                                     currentTrip.PaymentAmount = reader.GetDecimal(reader.GetOrdinal("PaymentAmount"));
 
@@ -100,7 +95,6 @@ namespace Tutorial8.Services
                                 lastTripId = tripId;
                             }
 
-                            // Dodaj kraj do wycieczki jeśli istnieje
                             if (!reader.IsDBNull(reader.GetOrdinal("IdCountry")))
                             {
                                 currentTrip.Countries.Add(new CountryDTO
@@ -118,14 +112,12 @@ namespace Tutorial8.Services
 
         public async Task<int> CreateClient(CreateClientDTO client)
         {
-            // Walidacja danych
             ValidateClientData(client);
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
 
-                // Sprawdzenie czy klient z takim PESEL już istnieje
                 using (SqlCommand checkCmd = new SqlCommand("SELECT COUNT(1) FROM Client WHERE Pesel = @Pesel", conn))
                 {
                     checkCmd.Parameters.AddWithValue("@Pesel", client.Pesel);
@@ -134,7 +126,6 @@ namespace Tutorial8.Services
                         throw new Exception("Klient z podanym numerem PESEL już istnieje");
                 }
 
-                // Dodanie klienta
                 string insertQuery = @"
                     INSERT INTO Client (FirstName, LastName, Email, Telephone, Pesel)
                     VALUES (@FirstName, @LastName, @Email, @Telephone, @Pesel);
@@ -148,7 +139,6 @@ namespace Tutorial8.Services
                     cmd.Parameters.AddWithValue("@Telephone", client.Telephone);
                     cmd.Parameters.AddWithValue("@Pesel", client.Pesel);
 
-                    // Pobieramy ID nowo utworzonego klienta
                     var result = await cmd.ExecuteScalarAsync();
                     return Convert.ToInt32(result);
                 }
@@ -161,23 +151,18 @@ namespace Tutorial8.Services
             {
                 await conn.OpenAsync();
                 
-                // Sprawdzenie czy klient istnieje
                 if (!await CheckClientExists(conn, clientId))
                     return (false, $"Klient o ID {clientId} nie istnieje.");
 
-                // Sprawdzenie czy wycieczka istnieje
                 if (!await CheckTripExists(conn, tripId))
                     return (false, $"Wycieczka o ID {tripId} nie istnieje.");
 
-                // Sprawdzenie czy klient jest już zapisany na wycieczkę
                 if (await IsClientRegisteredForTrip(conn, clientId, tripId))
                     return (false, "Klient jest już zapisany na tę wycieczkę.");
 
-                // Sprawdzenie dostępności miejsc
                 if (!await CheckTripAvailability(conn, tripId))
                     return (false, "Brak wolnych miejsc na wycieczce.");
 
-                // Rejestracja klienta na wycieczkę
                 string insertQuery = @"
                     INSERT INTO Client_Trip (IdClient, IdTrip, RegisteredAt, PaymentDate, PaymentAmount)
                     VALUES (@IdClient, @IdTrip, @RegisteredAt, NULL, NULL)";
@@ -200,15 +185,12 @@ namespace Tutorial8.Services
             {
                 await conn.OpenAsync();
 
-                // Sprawdzenie czy rejestracja istnieje
                 if (!await IsClientRegisteredForTrip(conn, clientId, tripId))
                     return (false, "Klient nie jest zapisany na tę wycieczkę.");
 
-                // Sprawdzenie czy wycieczka jeszcze się nie rozpoczęła
                 if (await HasTripStarted(conn, tripId))
                     return (false, "Nie można wyrejestrować klienta z wycieczki, która już się rozpoczęła.");
 
-                // Usunięcie rejestracji
                 string deleteQuery = @"
                     DELETE FROM Client_Trip 
                     WHERE IdClient = @IdClient AND IdTrip = @IdTrip";
@@ -277,7 +259,6 @@ namespace Tutorial8.Services
             if (pesel.Length != 11 || !pesel.All(char.IsDigit))
                 return false;
 
-            // Tutaj można dodać bardziej zaawansowaną walidację PESEL
             return true;
         }
 
