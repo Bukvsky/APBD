@@ -1,0 +1,33 @@
+@Tutorial8_HostAddress = http://localhost:5128
+
+### 1. Pobierz wszystkie wycieczki
+GET {{Tutorial8_HostAddress}}/api/trips
+Accept: application/json
+
+### 2. Pobierz wycieczki konkretnego klienta
+GET {{Tutorial8_HostAddress}}/api/clients/1/trips
+Accept: application/json
+
+### 3. Dodaj nowego klienta
+POST {{Tutorial8_HostAddress}}/api/clients
+Content-Type: application/json
+
+{
+  "FirstName": "Jan",
+  "LastName": "Kowalski",
+  "Email": "jan.kowalski@example.com",
+  "Telephone": "123456789",
+  "Pesel": "12345678901"
+}
+
+### 4. Zarejestruj klienta na wycieczkę
+PUT {{Tutorial8_HostAddress}}/api/clients/1/trips/1
+Content-Type: application/json
+
+{
+  "PaymentDate": "2023-11-15",
+  "PaymentAmount": 1500.50
+}
+
+### 5. Usuń rejestrację klienta z wycieczki
+DELETE {{Tutorial8_HostAddress}}/api/clients/1/trips/1
