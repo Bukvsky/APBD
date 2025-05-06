@@ -1,18 +1,16 @@
 ﻿#!/bin/bash
-# Test API dla biura podróży
-# Skrypt testuje wszystkie endpointy zdefiniowane w zadaniu
 
-# Adres bazowy API
+
+
 BASE_URL="http://localhost:5128/api"
 
-# Kolory dla lepszej czytelności
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
+NC='\033[0m' 
 
-# Funkcja wypisująca informacje o teście
+
 function print_test_info() {
   echo -e "\n${CYAN}=======================================${NC}"
   echo -e "${CYAN}TEST: $1${NC}"
@@ -27,7 +25,7 @@ print_test_info "Pobranie wszystkich wycieczek (GET /api/trips)"
 TRIPS_RESPONSE=$(curl -s "$BASE_URL/trips")
 echo -e "${GREEN}$TRIPS_RESPONSE${NC}"
 
-# Zapisanie ID pierwszej wycieczki do użycia w późniejszych testach
+
 FIRST_TRIP_ID=$(echo $TRIPS_RESPONSE | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
 if [ -z "$FIRST_TRIP_ID" ]; then
   echo -e "${RED}Nie znaleziono żadnych wycieczek!${NC}"
@@ -62,7 +60,7 @@ CREATE_CLIENT_RESPONSE=$(curl -s -X POST "$BASE_URL/clients" \
   -d "$NEW_CLIENT")
 echo -e "${GREEN}$CREATE_CLIENT_RESPONSE${NC}"
 
-# Zapisanie ID nowego klienta
+
 CLIENT_ID=$(echo $CREATE_CLIENT_RESPONSE | grep -o '"id":[0-9]*' | cut -d':' -f2)
 echo -e "${YELLOW}ID nowego klienta: $CLIENT_ID${NC}"
 
@@ -106,9 +104,7 @@ print_test_info "Pobranie wycieczek klienta po usunięciu rejestracji"
 CLIENT_TRIPS_AFTER_UNREG=$(curl -s "$BASE_URL/clients/$CLIENT_ID/trips")
 echo -e "${GREEN}$CLIENT_TRIPS_AFTER_UNREG${NC}"
 
-# -------------------------------------------------------
-# Podsumowanie
-# -------------------------------------------------------
+
 echo -e "\n${YELLOW}=======================================${NC}"
 echo -e "${YELLOW}TESTY ZAKOŃCZONE${NC}"
 echo -e "${YELLOW}=======================================${NC}"
