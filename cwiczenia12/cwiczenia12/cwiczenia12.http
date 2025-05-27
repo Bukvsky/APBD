@@ -1,0 +1,17 @@
+@cwiczenia12_HostAddress = http://localhost:5059
+
+GET {{cwiczenia12_HostAddress}}/api/trips?page=1&pageSize=5
+Accept: application/json
+
+DELETE {{cwiczenia12_HostAddress}}/api/clients/3
+Accept: application/json
+
+
+POST {{cwiczenia12_HostAddress}}/api/trips/1/clients
+Content-Type: application/json
+Accept: application/json
+
+GET {{cwiczenia12_HostAddress}}/api/trips
+Accept: application/json
+
+###
