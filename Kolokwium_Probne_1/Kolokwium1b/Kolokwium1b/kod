@@ -1,0 +1,615 @@
+// Program.cs
+using Microsoft.EntityFrameworkCore;
+using WorkshopAPI.Data;
+using WorkshopAPI.Repositories;
+using WorkshopAPI.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Database context
+builder.Services.AddDbContext<WorkshopDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Dependency injection
+builder.Services.AddScoped<IVisitRepository, VisitRepository>();
+builder.Services.AddScoped<IClientRepository, ClientRepository>();
+builder.Services.AddScoped<IMechanicRepository, MechanicRepository>();
+builder.Services.AddScoped<IServiceRepository, ServiceRepository>();
+builder.Services.AddScoped<IVisitService, VisitService>();
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();
+
+// ===== MODELS =====
+
+// Models/Client.cs
+namespace WorkshopAPI.Models
+{
+    public class Client
+    {
+        public int ClientId { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public DateTime DateOfBirth { get; set; }
+        
+        public virtual ICollection<Visit> Visits { get; set; } = new List<Visit>();
+    }
+}
+
+// Models/Mechanic.cs
+namespace WorkshopAPI.Models
+{
+    public class Mechanic
+    {
+        public int MechanicId { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string LicenceNumber { get; set; } = string.Empty;
+        
+        public virtual ICollection<Visit> Visits { get; set; } = new List<Visit>();
+    }
+}
+
+// Models/Service.cs
+namespace WorkshopAPI.Models
+{
+    public class Service
+    {
+        public int ServiceId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public decimal BaseFee { get; set; }
+        
+        public virtual ICollection<VisitService> VisitServices { get; set; } = new List<VisitService>();
+    }
+}
+
+// Models/Visit.cs
+namespace WorkshopAPI.Models
+{
+    public class Visit
+    {
+        public int VisitId { get; set; }
+        public int ClientId { get; set; }
+        public int MechanicId { get; set; }
+        public DateTime Date { get; set; }
+        
+        public virtual Client Client { get; set; } = null!;
+        public virtual Mechanic Mechanic { get; set; } = null!;
+        public virtual ICollection<VisitService> VisitServices { get; set; } = new List<VisitService>();
+    }
+}
+
+// Models/VisitService.cs
+namespace WorkshopAPI.Models
+{
+    public class VisitService
+    {
+        public int VisitId { get; set; }
+        public int ServiceId { get; set; }
+        public decimal ServiceFee { get; set; }
+        
+        public virtual Visit Visit { get; set; } = null!;
+        public virtual Service Service { get; set; } = null!;
+    }
+}
+
+// ===== DTOs =====
+
+// DTOs/VisitDetailsDto.cs
+namespace WorkshopAPI.DTOs
+{
+    public class VisitDetailsDto
+    {
+        public DateTime Date { get; set; }
+        public ClientDto Client { get; set; } = null!;
+        public MechanicDto Mechanic { get; set; } = null!;
+        public List<VisitServiceDto> VisitServices { get; set; } = new();
+    }
+
+    public class ClientDto
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public DateTime DateOfBirth { get; set; }
+    }
+
+    public class MechanicDto
+    {
+        public int MechanicId { get; set; }
+        public string LicenceNumber { get; set; } = string.Empty;
+    }
+
+    public class VisitServiceDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public decimal ServiceFee { get; set; }
+    }
+}
+
+// DTOs/CreateVisitDto.cs
+namespace WorkshopAPI.DTOs
+{
+    public class CreateVisitDto
+    {
+        public int VisitId { get; set; }
+        public int ClientId { get; set; }
+        public string MechanicLicenceNumber { get; set; } = string.Empty;
+        public List<CreateVisitServiceDto> Services { get; set; } = new();
+    }
+
+    public class CreateVisitServiceDto
+    {
+        public string ServiceName { get; set; } = string.Empty;
+        public decimal ServiceFee { get; set; }
+    }
+}
+
+// ===== DATABASE CONTEXT =====
+
+// Data/WorkshopDbContext.cs
+using Microsoft.EntityFrameworkCore;
+using WorkshopAPI.Models;
+
+namespace WorkshopAPI.Data
+{
+    public class WorkshopDbContext : DbContext
+    {
+        public WorkshopDbContext(DbContextOptions<WorkshopDbContext> options) : base(options) { }
+
+        public DbSet<Client> Clients { get; set; }
+        public DbSet<Mechanic> Mechanics { get; set; }
+        public DbSet<Service> Services { get; set; }
+        public DbSet<Visit> Visits { get; set; }
+        public DbSet<VisitService> VisitServices { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            // Client configuration
+            modelBuilder.Entity<Client>(entity =>
+            {
+                entity.HasKey(e => e.ClientId);
+                entity.Property(e => e.FirstName).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.LastName).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.DateOfBirth).IsRequired();
+            });
+
+            // Mechanic configuration
+            modelBuilder.Entity<Mechanic>(entity =>
+            {
+                entity.HasKey(e => e.MechanicId);
+                entity.Property(e => e.FirstName).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.LastName).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.LicenceNumber).HasMaxLength(14).IsRequired();
+            });
+
+            // Service configuration
+            modelBuilder.Entity<Service>(entity =>
+            {
+                entity.HasKey(e => e.ServiceId);
+                entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.BaseFee).HasColumnType("decimal(10,2)").IsRequired();
+            });
+
+            // Visit configuration
+            modelBuilder.Entity<Visit>(entity =>
+            {
+                entity.HasKey(e => e.VisitId);
+                entity.Property(e => e.Date).IsRequired();
+                
+                entity.HasOne(d => d.Client)
+                    .WithMany(p => p.Visits)
+                    .HasForeignKey(d => d.ClientId);
+                    
+                entity.HasOne(d => d.Mechanic)
+                    .WithMany(p => p.Visits)
+                    .HasForeignKey(d => d.MechanicId);
+            });
+
+            // VisitService configuration
+            modelBuilder.Entity<VisitService>(entity =>
+            {
+                entity.HasKey(e => new { e.ServiceId, e.VisitId });
+                entity.Property(e => e.ServiceFee).HasColumnType("decimal(10,2)").IsRequired();
+                
+                entity.HasOne(d => d.Visit)
+                    .WithMany(p => p.VisitServices)
+                    .HasForeignKey(d => d.VisitId);
+                    
+                entity.HasOne(d => d.Service)
+                    .WithMany(p => p.VisitServices)
+                    .HasForeignKey(d => d.ServiceId);
+            });
+        }
+    }
+}
+
+// ===== REPOSITORIES =====
+
+// Repositories/IVisitRepository.cs
+using WorkshopAPI.Models;
+
+namespace WorkshopAPI.Repositories
+{
+    public interface IVisitRepository
+    {
+        Task<Visit?> GetVisitByIdAsync(int visitId);
+        Task<bool> VisitExistsAsync(int visitId);
+        Task<Visit> CreateVisitAsync(Visit visit);
+    }
+}
+
+// Repositories/VisitRepository.cs
+using Microsoft.EntityFrameworkCore;
+using WorkshopAPI.Data;
+using WorkshopAPI.Models;
+
+namespace WorkshopAPI.Repositories
+{
+    public class VisitRepository : IVisitRepository
+    {
+        private readonly WorkshopDbContext _context;
+
+        public VisitRepository(WorkshopDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<Visit?> GetVisitByIdAsync(int visitId)
+        {
+            return await _context.Visits
+                .Include(v => v.Client)
+                .Include(v => v.Mechanic)
+                .Include(v => v.VisitServices)
+                .ThenInclude(vs => vs.Service)
+                .FirstOrDefaultAsync(v => v.VisitId == visitId);
+        }
+
+        public async Task<bool> VisitExistsAsync(int visitId)
+        {
+            return await _context.Visits.AnyAsync(v => v.VisitId == visitId);
+        }
+
+        public async Task<Visit> CreateVisitAsync(Visit visit)
+        {
+            _context.Visits.Add(visit);
+            await _context.SaveChangesAsync();
+            return visit;
+        }
+    }
+}
+
+// Repositories/IClientRepository.cs
+namespace WorkshopAPI.Repositories
+{
+    public interface IClientRepository
+    {
+        Task<bool> ClientExistsAsync(int clientId);
+    }
+}
+
+// Repositories/ClientRepository.cs
+using Microsoft.EntityFrameworkCore;
+using WorkshopAPI.Data;
+
+namespace WorkshopAPI.Repositories
+{
+    public class ClientRepository : IClientRepository
+    {
+        private readonly WorkshopDbContext _context;
+
+        public ClientRepository(WorkshopDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<bool> ClientExistsAsync(int clientId)
+        {
+            return await _context.Clients.AnyAsync(c => c.ClientId == clientId);
+        }
+    }
+}
+
+// Repositories/IMechanicRepository.cs
+using WorkshopAPI.Models;
+
+namespace WorkshopAPI.Repositories
+{
+    public interface IMechanicRepository
+    {
+        Task<Mechanic?> GetMechanicByLicenceNumberAsync(string licenceNumber);
+    }
+}
+
+// Repositories/MechanicRepository.cs
+using Microsoft.EntityFrameworkCore;
+using WorkshopAPI.Data;
+using WorkshopAPI.Models;
+
+namespace WorkshopAPI.Repositories
+{
+    public class MechanicRepository : IMechanicRepository
+    {
+        private readonly WorkshopDbContext _context;
+
+        public MechanicRepository(WorkshopDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<Mechanic?> GetMechanicByLicenceNumberAsync(string licenceNumber)
+        {
+            return await _context.Mechanics
+                .FirstOrDefaultAsync(m => m.LicenceNumber == licenceNumber);
+        }
+    }
+}
+
+// Repositories/IServiceRepository.cs
+using WorkshopAPI.Models;
+
+namespace WorkshopAPI.Repositories
+{
+    public interface IServiceRepository
+    {
+        Task<Service?> GetServiceByNameAsync(string serviceName);
+    }
+}
+
+// Repositories/ServiceRepository.cs
+using Microsoft.EntityFrameworkCore;
+using WorkshopAPI.Data;
+using WorkshopAPI.Models;
+
+namespace WorkshopAPI.Repositories
+{
+    public class ServiceRepository : IServiceRepository
+    {
+        private readonly WorkshopDbContext _context;
+
+        public ServiceRepository(WorkshopDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<Service?> GetServiceByNameAsync(string serviceName)
+        {
+            return await _context.Services
+                .FirstOrDefaultAsync(s => s.Name == serviceName);
+        }
+    }
+}
+
+// ===== SERVICES =====
+
+// Services/IVisitService.cs
+using WorkshopAPI.DTOs;
+
+namespace WorkshopAPI.Services
+{
+    public interface IVisitService
+    {
+        Task<VisitDetailsDto?> GetVisitDetailsAsync(int visitId);
+        Task<bool> CreateVisitAsync(CreateVisitDto createVisitDto);
+    }
+}
+
+// Services/VisitService.cs
+using WorkshopAPI.DTOs;
+using WorkshopAPI.Models;
+using WorkshopAPI.Repositories;
+
+namespace WorkshopAPI.Services
+{
+    public class VisitService : IVisitService
+    {
+        private readonly IVisitRepository _visitRepository;
+        private readonly IClientRepository _clientRepository;
+        private readonly IMechanicRepository _mechanicRepository;
+        private readonly IServiceRepository _serviceRepository;
+
+        public VisitService(
+            IVisitRepository visitRepository,
+            IClientRepository clientRepository,
+            IMechanicRepository mechanicRepository,
+            IServiceRepository serviceRepository)
+        {
+            _visitRepository = visitRepository;
+            _clientRepository = clientRepository;
+            _mechanicRepository = mechanicRepository;
+            _serviceRepository = serviceRepository;
+        }
+
+        public async Task<VisitDetailsDto?> GetVisitDetailsAsync(int visitId)
+        {
+            var visit = await _visitRepository.GetVisitByIdAsync(visitId);
+            if (visit == null)
+                return null;
+
+            return new VisitDetailsDto
+            {
+                Date = visit.Date,
+                Client = new ClientDto
+                {
+                    FirstName = visit.Client.FirstName,
+                    LastName = visit.Client.LastName,
+                    DateOfBirth = visit.Client.DateOfBirth
+                },
+                Mechanic = new MechanicDto
+                {
+                    MechanicId = visit.Mechanic.MechanicId,
+                    LicenceNumber = visit.Mechanic.LicenceNumber
+                },
+                VisitServices = visit.VisitServices.Select(vs => new VisitServiceDto
+                {
+                    Name = vs.Service.Name,
+                    ServiceFee = vs.ServiceFee
+                }).ToList()
+            };
+        }
+
+        public async Task<bool> CreateVisitAsync(CreateVisitDto createVisitDto)
+        {
+            // Check if visit already exists
+            if (await _visitRepository.VisitExistsAsync(createVisitDto.VisitId))
+                return false;
+
+            // Check if client exists
+            if (!await _clientRepository.ClientExistsAsync(createVisitDto.ClientId))
+                return false;
+
+            // Check if mechanic exists
+            var mechanic = await _mechanicRepository.GetMechanicByLicenceNumberAsync(createVisitDto.MechanicLicenceNumber);
+            if (mechanic == null)
+                return false;
+
+            // Check if all services exist
+            var serviceIds = new List<int>();
+            foreach (var serviceDto in createVisitDto.Services)
+            {
+                var service = await _serviceRepository.GetServiceByNameAsync(serviceDto.ServiceName);
+                if (service == null)
+                    return false;
+                serviceIds.Add(service.ServiceId);
+            }
+
+            // Create visit
+            var visit = new Visit
+            {
+                VisitId = createVisitDto.VisitId,
+                ClientId = createVisitDto.ClientId,
+                MechanicId = mechanic.MechanicId,
+                Date = DateTime.Now,
+                VisitServices = createVisitDto.Services.Select((serviceDto, index) => new VisitService
+                {
+                    VisitId = createVisitDto.VisitId,
+                    ServiceId = serviceIds[index],
+                    ServiceFee = serviceDto.ServiceFee
+                }).ToList()
+            };
+
+            await _visitRepository.CreateVisitAsync(visit);
+            return true;
+        }
+    }
+}
+
+// ===== CONTROLLERS =====
+
+// Controllers/VisitsController.cs
+using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
+using WorkshopAPI.DTOs;
+using WorkshopAPI.Services;
+
+namespace WorkshopAPI.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class VisitsController : ControllerBase
+    {
+        private readonly IVisitService _visitService;
+
+        public VisitsController(IVisitService visitService)
+        {
+            _visitService = visitService;
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<VisitDetailsDto>> GetVisit(int id)
+        {
+            var visitDetails = await _visitService.GetVisitDetailsAsync(id);
+            
+            if (visitDetails == null)
+                return NotFound();
+
+            return Ok(visitDetails);
+        }
+
+        [HttpPost]
+        public async Task<ActionResult> CreateVisit([FromBody] CreateVisitDto createVisitDto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            // Validation
+            if (createVisitDto.VisitId <= 0)
+                return BadRequest("Visit ID must be greater than 0");
+
+            if (createVisitDto.ClientId <= 0)
+                return BadRequest("Client ID must be greater than 0");
+
+            if (string.IsNullOrWhiteSpace(createVisitDto.MechanicLicenceNumber))
+                return BadRequest("Mechanic licence number is required");
+
+            if (createVisitDto.Services == null || !createVisitDto.Services.Any())
+                return BadRequest("At least one service is required");
+
+            foreach (var service in createVisitDto.Services)
+            {
+                if (string.IsNullOrWhiteSpace(service.ServiceName))
+                    return BadRequest("Service name cannot be empty");
+
+                if (service.ServiceFee <= 0)
+                    return BadRequest("Service fee must be greater than 0");
+            }
+
+            var result = await _visitService.CreateVisitAsync(createVisitDto);
+            
+            if (!result)
+                return Conflict("Visit with given ID already exists, or referenced client/mechanic/service does not exist");
+
+            return Created($"api/visits/{createVisitDto.VisitId}", null);
+        }
+    }
+}
+
+// ===== PROJECT FILE =====
+
+// WorkshopAPI.csproj
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+  </ItemGroup>
+
+</Project>
+
+// appsettings.json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=WorkshopDB;Trusted_Connection=true;MultipleActiveResultSets=true"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
